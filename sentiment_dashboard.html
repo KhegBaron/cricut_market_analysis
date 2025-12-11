@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cutting Machine Sentiment Explorer</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --bg: #f5f5f7;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text-main: #111827;
+      --text-sub: #6b7280;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --positive: #16a34a;
+      --neutral: #6b7280;
+      --negative: #dc2626;
+    }
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text-main);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 26px;
+      letter-spacing: .02em;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 14px;
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .logo-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      font-size: 11px;
+      color: #374151;
+    }
+
+    .logo-chip img {
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 2fr 1.8fr;
+      grid-template-rows: auto auto;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 14px 18px 18px 18px;
+      border: 1px solid var(--border);
+      box-shadow:
+        0 10px 30px rgba(15, 23, 42, 0.03),
+        0 1px 3px rgba(15, 23, 42, 0.08);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .card-subtitle {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+      background: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill.brand-pill {
+      cursor: pointer;
+      transition: all .18s ease;
+      opacity: .5;
+    }
+    .pill.brand-pill.active {
+      opacity: 1;
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: #1f2937;
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+    }
+    .pill-dot.cricut { background: #16a34a; }
+    .pill-dot.silhouette { background: #2563eb; }
+    .pill-dot.brother { background: #dc2626; }
+
+    .kpi-row {
+      display: flex;
+      gap: 16px;
+      margin: 8px 0 0;
+      flex-wrap: wrap;
+    }
+
+    .kpi {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+    .kpi strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    #brand-strip-svg {
+      width: 100%;
+      height: 160px;
+    }
+
+    #aspect-dots-svg {
+      width: 100%;
+      height: 220px;
+    }
+
+    #word-galaxy-svg {
+      width: 100%;
+      height: 260px;
+    }
+
+    .axis text {
+      fill: #6b7280;
+      font-size: 11px;
+    }
+    .axis line,
+    .axis path {
+      stroke: #d1d5db;
+      stroke-width: 1;
+    }
+
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--text-main);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      opacity: 0;
+      transform: translate(-50%, -110%);
+      z-index: 10;
+      max-width: 260px;
+      line-height: 1.4;
+    }
+
+    .reviews-panel {
+      font-size: 12px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .review-chip {
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      position: relative;
+    }
+    .review-chip.positive { border-color: var(--positive); }
+    .review-chip.negative { border-color: var(--negative); }
+
+    .review-meta {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-bottom: 3px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .sentiment-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .sentiment-tag.positive {
+      border-color: var(--positive);
+      color: var(--positive);
+    }
+    .sentiment-tag.negative {
+      border-color: var(--negative);
+      color: var(--negative);
+    }
+
+    .aspect-tag-small {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+
+    .review-body {
+      color: var(--text-main);
+    }
+
+    .small-label {
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-top: 6px;
+    }
+
+    .dot-legend {
+      font-size: 10px;
+      color: var(--text-sub);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .galaxy-label {
+      font-size: 10px;
+      fill: #111827;
+      pointer-events: none;
+    }
+
+    .galaxy-bubble {
+      cursor: grab;
+      stroke: #ffffff;
+      stroke-width: 1;
+    }
+  </style>
+</head>
+<body>
+  <h1>How Do People Feel About Cricut, Silhouette, and Brother?</h1>
+  <div class="subtitle">
+    Scraped Amazon-style reviews → sentiment analysis → aspect tagging (software, hardware, materials, support). Explore the emotional fingerprint of each brand.
+  </div>
+
+  <div class="logo-row">
+    <div class="logo-chip">
+      <img src="cricut/cricut_logo.png" alt="Cricut logo" />
+      Cricut
+    </div>
+    <div class="logo-chip">
+      <img src="silhouette/silhouette_logo.jpg" alt="Silhouette logo" />
+      Silhouette
+    </div>
+    <div class="logo-chip">
+      <img src="brother/brother_logo.png" alt="Brother logo" />
+      Brother
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT TOP: brand sentiment mix -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Brand Sentiment Mix</div>
+          <div class="card-subtitle">
+            Distribution of positive / neutral / negative reviews · click a brand to focus.
+          </div>
+        </div>
+        <div class="pill-row" id="brand-pills"></div>
+      </div>
+      <svg id="brand-strip-svg"></svg>
+      <div class="kpi-row" id="brand-kpis"></div>
+      <div class="small-label">
+        Bars are normalized to 100% per brand (VADER labels → positive / neutral / negative).
+      </div>
+    </div>
+
+    <!-- RIGHT TOP: aspect issues -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Where Problems Cluster by Aspect</div>
+          <div class="card-subtitle">
+            Each point is a brand × aspect pair. Vertical position = % negative reviews, size = review volume.
+          </div>
+        </div>
+        <div class="dot-legend">
+          <span>Brand</span>
+          <span class="legend-swatch" style="background:#16a34a;"></span><span>Cricut</span>
+          <span class="legend-swatch" style="background:#2563eb;"></span><span>Silhouette</span>
+          <span class="legend-swatch" style="background:#dc2626;"></span><span>Brother</span>
+        </div>
+      </div>
+      <svg id="aspect-dots-svg"></svg>
+      <div class="small-label">
+        Click a point to drill into that brand + aspect in the reviews & keyword galaxy panels.
+      </div>
+    </div>
+
+    <!-- LEFT BOTTOM: reviews -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Live Review Receipts</div>
+          <div class="card-subtitle" id="review-panel-subtitle">
+            Click a brand or a dot above to explore strongest positive and negative reviews.
+          </div>
+        </div>
+      </div>
+      <div class="reviews-panel" id="reviews-panel"></div>
+      <div class="small-label">
+        Reviews are sorted by sentiment intensity. 
+      </div>
+    </div>
+
+    <!-- RIGHT BOTTOM: keyword galaxy -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Keyword Galaxy</div>
+          <div class="card-subtitle" id="galaxy-subtitle">
+            Most frequent words in the current slice · drag the bubbles around to explore the cluster.
+          </div>
+        </div>
+      </div>
+      <svg id="word-galaxy-svg"></svg>
+      <div class="small-label">
+        Brand/feature-specific vocabulary shows what people actually talk about (e.g., “design space”, “mat”, “blade”).
+      </div>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+  <script>
+    const tooltip = d3.select("#tooltip");
+    let selectedBrand = null;
+    let selectedAspect = null;
+
+    const brandColor = {
+      cricut: "#16a34a",
+      silhouette: "#2563eb",
+      brother: "#dc2626"
+    };
+
+    const STOPWORDS = new Set([
+      "the","and","for","with","that","this","was","are","but","have","has","had","you","your","they","them","their",
+      "about","from","will","would","could","should","just","very","really","into","more","some","been","being",
+      "than","then","when","what","which","where","who","how","why","can","cant","cannot","did","didnt","not","like",
+      "all","any","also","use","used","using","get","got","make","made","one","two","three","four","five","six",
+      "out","up","down","on","off","in","it","its","is","im","we","our","at","as","of","to","so","my","me","or","an",
+      "if","because","though","still","back","only","even","over","again","buy","bought","purchase","purchased",
+      "machine","machines","cricut","silhouette","brother"
+    ]);
+
+    function getFilteredReviews(reviews) {
+      let filtered = reviews;
+      if (selectedBrand) {
+        filtered = filtered.filter(d => d.brand === selectedBrand);
+      }
+      if (selectedAspect) {
+        filtered = filtered.filter(d => d.aspect === selectedAspect);
+      }
+      return filtered;
+    }
+
+    Promise.all([
+      d3.csv("brand_sentiment_summary.csv", d3.autoType),
+      d3.csv("brand_aspect_summary.csv", d3.autoType),
+      d3.csv("reviews_with_sentiment.csv", d3.autoType)
+    ]).then(([brandSummary, brandAspect, reviews]) => {
+      // normalize
+      brandSummary.forEach(d => d.brand = (d.brand || "").toLowerCase());
+      brandAspect.forEach(d => {
+        d.brand = (d.brand || "").toLowerCase();
+        d.aspect = (d.aspect || "").toLowerCase();
+      });
+      reviews.forEach(d => {
+        d.brand = (d.brand || "").toLowerCase();
+        d.aspect = (d.aspect || "").toLowerCase();
+      });
+
+      const brands = Array.from(new Set(brandSummary.map(d => d.brand))).sort();
+      const aspects = Array.from(new Set(brandAspect.map(d => d.aspect))).sort();
+
+      // brand pills
+      const pillRow = d3.select("#brand-pills");
+      const brandPills = pillRow.selectAll(".brand-pill")
+        .data(brands, d => d)
+        .join("div")
+        .attr("class", d => "pill brand-pill " + (d === "cricut" ? "active" : ""))
+        .on("click", (event, d) => {
+          selectedBrand = (selectedBrand === d) ? null : d;
+          selectedAspect = null;
+          brandPills.classed("active", b => selectedBrand ? (b === selectedBrand) : (b === "cricut"));
+          updateBrandStrip();
+          updateKpis();
+          updateAspectDots();
+          updateReviewPanel();
+          updateWordGalaxy();
+        });
+
+      brandPills.html(d => `
+        <span class="pill-dot ${d}"></span>
+        ${d.charAt(0).toUpperCase() + d.slice(1)}
+      `);
+
+      selectedBrand = brands.includes("cricut") ? "cricut" : brands[0];
+
+      const kpiRow = d3.select("#brand-kpis");
+
+      function updateKpis() {
+        const focusBrand = selectedBrand || brands[0];
+        const row = brandSummary.find(d => d.brand === focusBrand);
+        if (!row) return;
+
+        const pctPos = (row.pct_positive * 100).toFixed(1);
+        const pctNeu = (row.pct_neutral * 100).toFixed(1);
+        const pctNeg = (row.pct_negative * 100).toFixed(1);
+        const avgRating = row.avg_rating ? row.avg_rating.toFixed(2) : "–";
+
+        const kpis = [
+          { label: "Reviews", value: row.n_reviews },
+          { label: "Avg rating", value: avgRating },
+          { label: "% positive", value: pctPos + "%" },
+          { label: "% neutral", value: pctNeu + "%" },
+          { label: "% negative", value: pctNeg + "%" }
+        ];
+
+        const kEls = kpiRow.selectAll(".kpi")
+          .data(kpis)
+          .join("div")
+          .attr("class", "kpi");
+
+        kEls.html(d => `<strong>${d.value}</strong><span> ${d.label}</span>`);
+      }
+
+      // --- Brand Sentiment Strip ---
+      const stripSvg = d3.select("#brand-strip-svg");
+      const stripWidth = stripSvg.node().clientWidth || 600;
+      const stripHeight = stripSvg.node().clientHeight || 160;
+      const stripMargin = { top: 25, right: 20, bottom: 35, left: 60 };
+      const sInnerW = stripWidth - stripMargin.left - stripMargin.right;
+      const sInnerH = stripHeight - stripMargin.top - stripMargin.bottom;
+
+      stripSvg.attr("width", stripWidth).attr("height", stripHeight);
+
+      const stripG = stripSvg.append("g")
+        .attr("transform", `translate(${stripMargin.left},${stripMargin.top})`);
+
+      const xBrand = d3.scaleBand()
+        .domain(brands)
+        .range([0, sInnerW])
+        .padding(0.45);
+
+      const sentimentLabels = ["negative", "neutral", "positive"];
+      const colorSentiment = d3.scaleOrdinal()
+        .domain(sentimentLabels)
+        .range(["#fecaca", "#e5e7eb", "#bbf7d0"]);
+
+      stripG.append("g")
+        .attr("class", "axis x-axis-strip")
+        .attr("transform", `translate(0,${sInnerH})`)
+        .call(d3.axisBottom(xBrand));
+
+      stripG.append("g")
+        .attr("class", "axis y-axis-strip")
+        .call(
+          d3.axisLeft(
+            d3.scaleLinear().domain([0, 1]).range([sInnerH, 0])
+          )
+          .ticks(3)
+          .tickFormat(d => d * 100 + "%")
+        );
+
+      function prepareStripData() {
+        return brandSummary.map(d => ({
+          brand: d.brand,
+          positive: d.pct_positive,
+          neutral: d.pct_neutral,
+          negative: d.pct_negative
+        }));
+      }
+
+      function updateBrandStrip() {
+        const data = prepareStripData();
+
+        const stacked = d3.stack()
+          .keys(sentimentLabels)
+          (data.map(d => ({
+            brand: d.brand,
+            positive: d.positive,
+            neutral: d.neutral,
+            negative: d.negative
+          })));
+
+        const yScale = d3.scaleLinear()
+          .domain([0, 1])
+          .range([sInnerH, 0]);
+
+        const groups = stripG.selectAll(".stack-group")
+          .data(stacked, d => d.key);
+
+        const groupsEnter = groups.enter()
+          .append("g")
+          .attr("class", "stack-group")
+          .attr("fill", d => colorSentiment(d.key));
+
+        const groupsMerged = groupsEnter.merge(groups);
+
+        const rects = groupsMerged.selectAll("rect")
+          .data(d => d, d => d.data.brand);
+
+        const rectsEnter = rects.enter()
+          .append("rect")
+          .attr("x", d => xBrand(d.data.brand))
+          .attr("width", xBrand.bandwidth())
+          .attr("y", sInnerH)
+          .attr("height", 0);
+
+        rectsEnter.merge(rects)
+          .on("click", (event, d) => {
+            const brand = d.data.brand;
+            selectedBrand = (selectedBrand === brand) ? null : brand;
+            selectedAspect = null;
+            brandPills.classed("active", b => selectedBrand ? b === selectedBrand : b === "cricut");
+            updateBrandStrip();
+            updateKpis();
+            updateAspectDots();
+            updateReviewPanel();
+            updateWordGalaxy();
+          })
+          .transition()
+          .duration(650)
+          .attr("x", d => xBrand(d.data.brand))
+          .attr("width", xBrand.bandwidth())
+          .attr("y", d => yScale(d[1]))
+          .attr("height", d => yScale(d[0]) - yScale(d[1]));
+
+        rects.exit().remove();
+
+        stripG.selectAll("rect")
+          .attr("opacity", d => {
+            const b = d.data.brand;
+            if (!selectedBrand) return 0.95;
+            return b === selectedBrand ? 1 : 0.4;
+          })
+          .style("stroke", d => {
+            const b = d.data.brand;
+            return (selectedBrand && b === selectedBrand) ? brandColor[b] : "none";
+          })
+          .style("stroke-width", d => {
+            const b = d.data.brand;
+            return (selectedBrand && b === selectedBrand) ? 1.4 : 0;
+          });
+      }
+
+      updateBrandStrip();
+      updateKpis();
+      brandPills.classed("active", b => b === selectedBrand);
+
+      // --- Aspect Sentiment Dot Plot (Y = % negative) ---
+      const dotsSvg = d3.select("#aspect-dots-svg");
+      const dWidth = dotsSvg.node().clientWidth || 420;
+      const dHeight = dotsSvg.node().clientHeight || 220;
+      const dMargin = { top: 24, right: 16, bottom: 32, left: 72 };
+      const dInnerW = dWidth - dMargin.left - dMargin.right;
+      const dInnerH = dHeight - dMargin.top - dMargin.bottom;
+
+      dotsSvg.attr("width", dWidth).attr("height", dHeight);
+
+      const dG = dotsSvg.append("g")
+        .attr("transform", `translate(${dMargin.left},${dMargin.top})`);
+
+      const xAspect = d3.scaleBand()
+        .domain(aspects)
+        .range([0, dInnerW])
+        .padding(0.35);
+
+      // y: share of negative reviews (0–1)
+      const yNeg = d3.scaleLinear()
+        .domain([0, 1])
+        .range([dInnerH, 0]);
+
+      dG.append("g")
+        .attr("class", "axis x-axis-dots")
+        .attr("transform", `translate(0,${dInnerH})`)
+        .call(d3.axisBottom(xAspect));
+
+      dG.append("g")
+        .attr("class", "axis y-axis-dots")
+        .call(d3.axisLeft(yNeg).ticks(5).tickFormat(d => (d * 100) + "%"));
+
+      const rScale = d3.scaleSqrt()
+        .domain(d3.extent(brandAspect, d => d.total || 1))
+        .range([4, 16]);
+
+      const brandOffset = {};
+      brands.forEach((b, i) => {
+        const center = (brands.length - 1) / 2;
+        brandOffset[b] = (i - center) * 10;  // pixel offset
+      });
+
+      function updateAspectDots() {
+        const cellsData = brandAspect.map(d => ({
+          brand: d.brand,
+          aspect: d.aspect,
+          pct_positive: d.pct_positive || 0,
+          pct_neutral: d.pct_neutral || 0,
+          pct_negative: d.pct_negative || 0,
+          total: d.total || (d.positive + d.neutral + d.negative) || 0
+        }));
+
+        const circles = dG.selectAll("circle.aspect-dot")
+          .data(cellsData, d => d.brand + "-" + d.aspect);
+
+        const circlesEnter = circles.enter()
+          .append("circle")
+          .attr("class", "aspect-dot")
+          .attr("cx", d => {
+            const base = (xAspect(d.aspect) || 0) + xAspect.bandwidth() / 2;
+            return base + (brandOffset[d.brand] || 0);
+          })
+          .attr("cy", yNeg(0))
+          .attr("r", 0)
+          .attr("fill", d => brandColor[d.brand] || "#9ca3af")
+          .attr("fill-opacity", 0.85)
+          .attr("stroke", "#ffffff")
+          .attr("stroke-width", 1)
+          .on("mousemove", (event, d) => {
+            const pctPos = (d.pct_positive * 100).toFixed(1);
+            const pctNeu = (d.pct_neutral * 100).toFixed(1);
+            const pctNeg = (d.pct_negative * 100).toFixed(1);
+            tooltip
+              .style("opacity", 1)
+              .style("left", (event.pageX) + "px")
+              .style("top", (event.pageY - 16) + "px")
+              .html(`
+                <strong>${d.brand.toUpperCase()} · ${d.aspect.toUpperCase()}</strong><br/>
+                % positive: ${pctPos}% · % neutral: ${pctNeu}% · % negative: ${pctNeg}%<br/>
+                Reviews in this slice: ${d.total}
+              `);
+          })
+          .on("mouseleave", () => {
+            tooltip.style("opacity", 0);
+          })
+          .on("click", (event, d) => {
+            selectedBrand = d.brand;
+            selectedAspect = d.aspect;
+            brandPills.classed("active", b => b === selectedBrand);
+            updateBrandStrip();
+            updateKpis();
+            updateAspectDots();
+            updateReviewPanel();
+            updateWordGalaxy();
+          });
+
+        circlesEnter.merge(circles)
+          .transition()
+          .duration(650)
+          .attr("cx", d => {
+            const base = (xAspect(d.aspect) || 0) + xAspect.bandwidth() / 2;
+            return base + (brandOffset[d.brand] || 0);
+          })
+          .attr("cy", d => yNeg(d.pct_negative || 0))
+          .attr("r", d => rScale(d.total || 1))
+          .attr("fill-opacity", d => {
+            const brandMatch = !selectedBrand || d.brand === selectedBrand;
+            const aspectMatch = !selectedAspect || d.aspect === selectedAspect;
+            return (brandMatch && aspectMatch) ? 0.95 : 0.25;
+          });
+
+        circles.exit().remove();
+      }
+
+      updateAspectDots();
+
+      // --- Review panel ---
+      const reviewsPanel = d3.select("#reviews-panel");
+      const reviewSubtitle = d3.select("#review-panel-subtitle");
+
+      function formatReviewHtml(d) {
+        const truncated = (d.body || "").length > 260
+          ? d.body.slice(0, 260) + "…"
+          : d.body || "";
+
+        const brand = d.brand ? d.brand.toUpperCase() : "";
+        const aspect = d.aspect ? d.aspect.toUpperCase() : "OTHER";
+        const label = d.sentiment_label || "neutral";
+        const rating = d.rating ? d.rating.toFixed(1) + "★" : "–";
+        const date = d.date || "";
+
+        return `
+          <div class="review-meta">
+            <span>${brand} · ${rating} · ${date}</span>
+            <span>
+              <span class="aspect-tag-small">${aspect}</span>
+              <span class="sentiment-tag ${label}">${label}</span>
+            </span>
+          </div>
+          <div class="review-body">${truncated}</div>
+        `;
+      }
+
+      function updateReviewPanel() {
+        const slice = getFilteredReviews(reviews);
+        if (!slice.length) {
+          reviewsPanel.html(`<div class="small-label">No matching reviews for this slice yet.</div>`);
+          return;
+        }
+
+        // use compound only for ordering; not displayed
+        const negatives = slice
+          .filter(d => d.sentiment_label === "negative")
+          .sort((a, b) => a.compound - b.compound)
+          .slice(0, 3);
+
+        const positives = slice
+          .filter(d => d.sentiment_label === "positive")
+          .sort((a, b) => b.compound - a.compound)
+          .slice(0, 3);
+
+        const examples = [...negatives, ...positives];
+
+        const brandLabel = selectedBrand ? selectedBrand.toUpperCase() : "ALL BRANDS";
+        const aspectLabel = selectedAspect ? selectedAspect.toUpperCase() : "ALL ASPECTS";
+
+        reviewSubtitle.text(`Showing strongest positive & negative reviews for ${brandLabel} · ${aspectLabel}`);
+
+        const chips = reviewsPanel.selectAll(".review-chip")
+          .data(examples, d => d.brand + d.title + d.date + d.compound);
+
+        chips.enter()
+          .append("div")
+          .attr("class", d => "review-chip " + d.sentiment_label)
+          .html(d => formatReviewHtml(d))
+          .merge(chips)
+          .transition()
+          .duration(350)
+          .style("opacity", 1);
+
+        chips.exit()
+          .transition()
+          .duration(200)
+          .style("opacity", 0)
+          .remove();
+      }
+
+      // --- Keyword Galaxy ---
+      const galaxySvg = d3.select("#word-galaxy-svg");
+      const gWidth = galaxySvg.node().clientWidth || 420;
+      const gHeight = galaxySvg.node().clientHeight || 260;
+      const gMargin = { top: 6, right: 6, bottom: 6, left: 6 };
+      const gInnerW = gWidth - gMargin.left - gMargin.right;
+      const gInnerH = gHeight - gMargin.top - gMargin.bottom;
+
+      galaxySvg.attr("width", gWidth).attr("height", gHeight);
+
+      const galaxyG = galaxySvg.append("g")
+        .attr("transform", `translate(${gMargin.left},${gMargin.top})`);
+
+      function updateWordGalaxy() {
+        const slice = getFilteredReviews(reviews);
+        if (!slice.length) {
+          galaxyG.selectAll("*").remove();
+          galaxyG.append("text")
+            .attr("x", gInnerW / 2)
+            .attr("y", gInnerH / 2)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#9ca3af")
+            .attr("font-size", 11)
+            .text("No reviews available for this slice.");
+          return;
+        }
+
+        const counts = new Map();
+
+        slice.forEach(r => {
+          const text = (r.body || "").toLowerCase();
+          const words = text.split(/[^a-z0-9\+]+/);
+          words.forEach(w => {
+            if (!w || w.length < 3) return;
+            if (STOPWORDS.has(w)) return;
+            if (/^\d+$/.test(w)) return;
+            const c = counts.get(w) || 0;
+            counts.set(w, c + 1);
+          });
+        });
+
+        let freq = Array.from(counts, ([word, count]) => ({ word, count }));
+        freq.sort((a, b) => b.count - a.count);
+        freq = freq.slice(0, 25);
+
+        if (!freq.length) {
+          galaxyG.selectAll("*").remove();
+          galaxyG.append("text")
+            .attr("x", gInnerW / 2)
+            .attr("y", gInnerH / 2)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#9ca3af")
+            .attr("font-size", 11)
+            .text("No meaningful keywords in this slice.");
+          return;
+        }
+
+        const maxCount = d3.max(freq, d => d.count);
+        const rScale = d3.scaleSqrt()
+          .domain([1, maxCount])
+          .range([10, 40]);
+
+        const nodes = freq.map(d => ({
+          word: d.word,
+          count: d.count,
+          r: rScale(d.count),
+          x: gInnerW / 2 + (Math.random() - 0.5) * 40,
+          y: gInnerH / 2 + (Math.random() - 0.5) * 40
+        }));
+
+        galaxyG.selectAll("*").remove();
+
+        const node = galaxyG.selectAll("g.node")
+          .data(nodes)
+          .enter()
+          .append("g")
+          .attr("class", "node");
+
+        const brandForColor = selectedBrand || "cricut";
+        const baseColor = brandColor[brandForColor] || "#2563eb";
+
+        node.append("circle")
+          .attr("class", "galaxy-bubble")
+          .attr("r", d => d.r)
+          .attr("cx", gInnerW / 2)
+          .attr("cy", gInnerH / 2)
+          .attr("fill", baseColor)
+          .attr("fill-opacity", 0.16);
+
+        node.append("text")
+          .attr("class", "galaxy-label")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.35em")
+          .attr("x", gInnerW / 2)
+          .attr("y", gInnerH / 2)
+          .text(d => d.word);
+
+        const simulation = d3.forceSimulation(nodes)
+          .force("charge", d3.forceManyBody().strength(-18))
+          .force("center", d3.forceCenter(gInnerW / 2, gInnerH / 2))
+          .force("collision", d3.forceCollide().radius(d => d.r + 4))
+          .on("tick", () => {
+            node.select("circle")
+              .attr("cx", d => d.x = Math.max(d.r, Math.min(gInnerW - d.r, d.x)))
+              .attr("cy", d => d.y = Math.max(d.r, Math.min(gInnerH - d.r, d.y)));
+
+            node.select("text")
+              .attr("x", d => d.x)
+              .attr("y", d => d.y);
+          });
+
+        function drag(sim) {
+          function dragstarted(event, d) {
+            if (!event.active) sim.alphaTarget(0.2).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+          }
+          function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+          }
+          function dragended(event, d) {
+            if (!event.active) sim.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+          }
+          return d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended);
+        }
+
+        node.call(drag(simulation));
+      }
+
+      // initial detail panels
+      updateReviewPanel();
+      updateWordGalaxy();
+
+    }).catch(err => {
+      console.error("Error loading data:", err);
+      alert("Error loading CSV files. Make sure brand_sentiment_summary.csv, brand_aspect_summary.csv, and reviews_with_sentiment.csv are in the same folder as this HTML file.");
+    });
+  </script>
+</body>
+</html>
