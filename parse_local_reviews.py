@@ -2,7 +2,7 @@ import csv
 import glob
 from bs4 import BeautifulSoup
 
-# Adjust patterns if names are slightly different
+Patterns
 BRAND_PATTERNS = {
     "brother": "brother/brother_page_*.html",
     "cricut": "cricut/cricut_page_*.html",
@@ -30,7 +30,7 @@ for brand, pattern in BRAND_PATTERNS.items():
             # Body text
             body = body_span.get_text(" ", strip=True)
 
-            # Walk upwards in the HTML to find associated rating, title, date
+            # move upwards in the HTML to find associated rating, title, date
             container = body_span
             # climb up a few levels to search around
             for _ in range(4):
