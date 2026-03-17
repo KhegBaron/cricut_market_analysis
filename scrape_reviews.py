@@ -229,13 +229,11 @@ def scrape_reviews(product_url, max_pages=5, output_file="reviews_output.csv"):
     save_reviews_to_csv(reviews, output_file)
 
 if __name__ == "__main__":
-    # You can use either:
-    # - an Amazon product page URL with /dp/...
-    # - OR an Amazon product-reviews URL like the one you have
+    
     product_url = "https://www.amazon.com/product-reviews/B0DVWCD3P7/ref=cm_cr_dp_d_show_all_btm?ie=UTF8&reviewerType=all_reviews"
 
     scrape_reviews(
         product_url=product_url,
-        max_pages=3,          # small while testing
+        max_pages=3,          
         output_file="reviews_output.csv"
     )
